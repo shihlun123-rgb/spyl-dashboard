@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>資產儀表板</title>
+<style>
+body{font-family:Arial,sans-serif;background:#f3f4f6;margin:0;padding:20px;}
+.container{max-width:1200px;margin:auto;}
+h1{text-align:center;}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:20px;margin-top:20px;}
+.card,.total{background:#fff;border-radius:20px;padding:20px;box-shadow:0 4px 12px rgba(0,0,0,.1);}
+.total{text-align:center;margin-top:25px;}
+input{width:100%;padding:10px;margin:5px 0 15px;border:1px solid #ccc;border-radius:10px;box-sizing:border-box;}
+.big{font-size:32px;font-weight:bold;}
+.info{font-size:24px;font-weight:bold;margin:10px 0;}
+</style>
+</head>
+<body>
+<div class="container">
+<h1>資產儀表板</h1>
+
+<div class="grid" id="assets"></div>
+
+<div class="total">
+<div>總資產</div>
+<div class="big" id="totalAssets">NT$ 0</div>
+
+<hr>
+<div>0050 / 00631＋00685 / 現金比例</div>
+<div class="info" id="ratio631Cash">0% / 0% / 0%</div>
+
+<hr>
+<div>台股 / 美股 / 韓股比例</div>
+<div class="info" id="stockRatio">0% / 0% / 0%</div>
+
+<hr>
+<div>美股曝險</div>
+<div class="info" id="usExposure">0%</div>
+<div id="usExposureAmount">NT$ 0</div>
+
+<div>台股曝險</div>
+<div class="info" id="twExposure">0%</div>
+<div id="twExposureAmount">NT$ 0</div>
+
+
+<hr>
+<div>總股票市值</div>
+<div class="info" id="totalStockValue">NT$ 0</div>
+<div>總市場曝險（含槓桿）</div>
+<div class="info" id="marketExposure">0%</div>
+<div id="marketExposureAmount">NT$ 0</div>
+</div>
+</div>
+
+<script>
+const assets = [
+{name:"SPYL",shares:"",price:"",exchangeRate:"",exposure:1},
+{name:"FLXK",shares:"",price:"",exchangeRate:"",exposure:1},
+ {name:"QNDX",shares:"",price:"",exchangeRate:"",exposure:1},
+{name:"0050",shares:"",price:"",exchangeRate:1,exposure:1},
+{name:"00631",shares:"",price:"",exchangeRate:1,exposure:2},
+{name:"00685",shares:"",price:"",exchangeRate:1,exposure:2},
+{name:"現金",shares:"",price:"",exchangeRate:1,exposure:0}
+];
+
+function render(){
+  const container=document.getElementById("assets");
+  container.innerHTML="";
+
+  const values=assets.map(a=>{
+    if(a.name==="現金") return parseFloat(a.price)||0;
+    return (parseFloat(a.shares)||0)*(parseFloat(a.price)||0)*(parseFloat(a.exchangeRate)||1);
+  });
+
+  const total=values.reduce((a,b)=>a+b,0);
+
+  assets.forEach((asset,index)=>{
+    const value=values[index];
+    const ratio=total>0?value/total*100:0;
+    const card=document.createElement("div");
+    card.className="card";
+
+    if(asset.name==="現金"){
+      card.innerHTML=`
+      <label>資產名稱</label>
+      <input value="${asset.name}">
+      <label>現金金額（台幣）</label>
+      <input type="number" value="${asset.price}" placeholder="現金金額" onchange="updateAsset(${index},'price',this.value)">
+      <hr>
+      <p><strong>資產市值：</strong> NT$ ${Math.round(value).toLocaleString()}</p>
+      <p><strong>配置比例：</strong> ${ratio.toFixed(2)}%</p>`;
+    } else {
+      card.innerHTML=`
+      <label>資產名稱</label>
+      <input value="${asset.name}">
+      <label>持股數</label>
+      <input type="number" value="${asset.shares}" placeholder="持股數" onchange="updateAsset(${index},'shares',this.value)">
+      <label>每股價格</label>
+      <input type="number" value="${asset.price}" placeholder="每股價格" onchange="updateAsset(${index},'price',this.value)">
+      ${(asset.name==="SPYL"||asset.name==="FLXK"||asset.name==="QNDX")?`
+      <label>匯率</label>
+      <input type="number" value="${asset.exchangeRate==1?"":asset.exchangeRate}" placeholder="美元→台幣匯率" onchange="updateAsset(${index},'exchangeRate',this.value)">
+      `:""}<hr>
+      <p><strong>資產市值：</strong> NT$ ${Math.round(value).toLocaleString()}</p>
+      <p><strong>配置比例：</strong> ${ratio.toFixed(2)}%</p>`;
+    }
+    container.appendChild(card);
+  });
+
+  document.getElementById("totalAssets").innerText="NT$ "+Math.round(total).toLocaleString();
+
+  const idxSPYL=0, idxFLXK=1, idxQNDX=2, idx0050=3, idx631=4, idx685=5, idxCash=6;
+
+  // 0050 / 00631＋00685（合併） / 現金配置比例
+  const leveragedTwValue=values[idx631]+values[idx685];
+  const subTotal=values[idx0050]+leveragedTwValue+values[idxCash];
+  const r0050=subTotal>0?values[idx0050]/subTotal*100:0;
+  const rLeveragedTw=subTotal>0?leveragedTwValue/subTotal*100:0;
+  const rCash=subTotal>0?values[idxCash]/subTotal*100:0;
+  document.getElementById("ratio631Cash").innerText=
+    `${r0050.toFixed(2)}% / ${rLeveragedTw.toFixed(2)}% / ${rCash.toFixed(2)}%`;
+
+  // 資產市值配置：SPYL 與 QNDX 都計入美股；FLXK 為韓股。
+  const twStock=values[idx0050]+values[idx631]+values[idx685];
+  const usStock=values[idxSPYL]+values[idxQNDX];
+  const krStock=values[idxFLXK];
+  const stockTotal=twStock+usStock+krStock;
+
+  const twRatio=stockTotal>0?twStock/stockTotal*100:0;
+  const usRatio=stockTotal>0?usStock/stockTotal*100:0;
+  const krRatio=stockTotal>0?krStock/stockTotal*100:0;
+
+  document.getElementById("stockRatio").innerText=
+    `${twRatio.toFixed(2)}% / ${usRatio.toFixed(2)}% / ${krRatio.toFixed(2)}%`;
+
+  // 市場曝險：
+  // SPYL = 100% 美國；QNDX = 100% 美國（Nasdaq 100，1 倍曝險）
+  // FLXK = 100% 韓國；0050 = 1 倍台股；00631、00685 = 2 倍台股
+  const usExposureAmount=
+    values[idxSPYL] + values[idxQNDX];
+
+  const twExposureAmount=
+    values[idx0050] + values[idx631]*2 + values[idx685]*2;
+
+  const krExposureAmount=
+    values[idxFLXK];
+
+  const marketExposureAmount=
+    usExposureAmount + twExposureAmount + krExposureAmount;
+
+  const usExposure=total>0?usExposureAmount/total*100:0;
+  const twExposure=total>0?twExposureAmount/total*100:0;
+  const krExposure=total>0?krExposureAmount/total*100:0;
+  const marketExposurePct=total>0?marketExposureAmount/total*100:0;
+
+  document.getElementById("usExposure").innerText=usExposure.toFixed(2)+"%";
+  document.getElementById("usExposureAmount").innerText=
+    "NT$ "+Math.round(usExposureAmount).toLocaleString();
+
+  document.getElementById("twExposure").innerText=twExposure.toFixed(2)+"%";
+  document.getElementById("twExposureAmount").innerText=
+    "NT$ "+Math.round(twExposureAmount).toLocaleString();
+
+  const krEl=document.getElementById("krExposure");
+  const krAmtEl=document.getElementById("krExposureAmount");
+  if(krEl) krEl.innerText=krExposure.toFixed(2)+"%";
+  if(krAmtEl) krAmtEl.innerText=
+    "NT$ "+Math.round(krExposureAmount).toLocaleString();
+
+  const totalStockValue=
+    values[idxSPYL]+values[idxFLXK]+values[idxQNDX]+ 
+    values[idx0050]+values[idx631]+values[idx685];
+
+  document.getElementById("totalStockValue").innerText=
+    "NT$ "+Math.round(totalStockValue).toLocaleString();
+
+  document.getElementById("marketExposure").innerText=
+    marketExposurePct.toFixed(2)+"%";
+  document.getElementById("marketExposureAmount").innerText=
+    "NT$ "+Math.round(marketExposureAmount).toLocaleString();
+}
+
+  function updateAsset(index,field,value){
+ assets[index][field]= value==="" ? "" : Number(value);
+ render();
+}
+
+render();
+</script>
+</body>
+</html>
