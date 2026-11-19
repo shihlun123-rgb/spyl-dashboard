@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#173b63">
+<title>7:3 再平衡試算</title>
+<style>
+*{box-sizing:border-box}body{margin:0;padding:14px;background:#f2f5f9;color:#17212b;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+main{max-width:720px;margin:auto}header{background:#173b63;color:white;padding:20px;border-radius:17px}h1{font-size:22px;margin:0 0 6px}header p{font-size:13px;line-height:1.5;margin:0;color:#dce8f5}
+.card{background:white;border:1px solid #e2e8f0;border-radius:15px;padding:15px;margin-top:13px}h2{font-size:16px;margin:0 0 13px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:10px}.field label{display:block;font-size:13px;color:#526171;margin-bottom:5px}
+input{width:100%;padding:12px 10px;border:1px solid #cbd5e1;border-radius:10px;font-size:17px;background:#fff;color:#17212b}input:focus{outline:2px solid #8ab4e2}.full{grid-column:1/-1}
+.metrics{display:grid;grid-template-columns:1fr 1fr;gap:9px}.metric{padding:12px;background:#f5f8fc;border-radius:11px}.metric small{display:block;color:#64748b;margin-bottom:5px}.metric b{font-size:19px;font-variant-numeric:tabular-nums}
+.bar{display:flex;height:13px;border-radius:20px;overflow:hidden;background:#e8edf4;margin:14px 0 8px}.stocks{background:#23845c}.cash{background:#d58a26}.legend{display:flex;justify-content:space-between;font-size:13px;color:#526171}
+table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:10px 5px;border-bottom:1px solid #e8edf3;text-align:right;font-variant-numeric:tabular-nums}th:first-child,td:first-child{text-align:left}th{color:#64748b;font-weight:600}
+.buy{color:#13764d;font-weight:700}.sell{color:#b45309;font-weight:700}.neutral{color:#64748b}
+.note{font-size:12px;color:#64748b;line-height:1.6;margin:10px 0 0}button{margin-top:11px;border:0;border-radius:10px;padding:11px 14px;background:#e8eef5;color:#173b63;font-weight:650}
+@media(max-width:390px){body{padding:9px}.card{padding:12px}.metric b{font-size:17px}th,td{font-size:12px;padding:9px 3px}}
+</style>
+</head>
+<body><main>
+<header><h1>00685／00631／現金<br>7:3 再平衡試算</h1><p>股票合計目標 70%，現金目標 30%。修改欄位後即時更新。</p></header>
+<section class="card"><h2>目前持有資料</h2><div class="grid">
+<div class="field"><label>00685 股數</label><input id="q685" type="number" inputmode="numeric" value="501000" min="0"></div>
+<div class="field"><label>00685 股價（元）</label><input id="p685" type="number" inputmode="decimal" value="7.96" min="0" step=".01"></div>
+<div class="field"><label>00631 股數</label><input id="q631" type="number" inputmode="numeric" value="228000" min="0"></div>
+<div class="field"><label>00631 股價（元）</label><input id="p631" type="number" inputmode="decimal" value="24.62" min="0" step=".01"></div>
+<div class="field full"><label>現金（元）</label><input id="cashInput" type="number" inputmode="decimal" value="4147000" min="0"></div>
+</div><button id="reset" type="button">恢復原始數字</button></section>
+<section class="card"><h2>目前資產配置</h2><div class="metrics">
+<div class="metric"><small>總資產</small><b id="total">—</b></div><div class="metric"><small>股票市值</small><b id="stock">—</b></div>
+<div class="metric"><small>股票比例</small><b id="stockPct">—</b></div><div class="metric"><small>現金比例</small><b id="cashPct">—</b></div>
+</div><div class="bar"><div class="stocks" id="stockBar"></div><div class="cash" id="cashBar"></div></div><div class="legend"><span>股票 <b id="stockLegend">—</b></span><span>現金 <b id="cashLegend">—</b></span></div></section>
+<section class="card"><h2>7:3 目標市值與調整金額</h2><table><thead><tr><th>項目</th><th>目前市值</th><th>目標市值</th><th>需調整</th></tr></thead><tbody>
+<tr><td>00685</td><td id="v685">—</td><td id="t685">—</td><td id="d685">—</td></tr>
+<tr><td>00631</td><td id="v631">—</td><td id="t631">—</td><td id="d631">—</td></tr>
+<tr><td>現金</td><td id="vCash">—</td><td id="tCash">—</td><td id="dCash">—</td></tr></tbody></table>
+<p class="note" id="targetNote">股票目標部位依兩檔目前市值比例分配，維持兩檔原有相對比例。</p></section>
+<section class="card"><h2>買賣股數參考</h2><table><thead><tr><th>標的</th><th>估計股數</th><th>方向</th></tr></thead><tbody>
+<tr><td>00685</td><td id="s685">—</td><td id="a685">—</td></tr><tr><td>00631</td><td id="s631">—</td><td id="a631">—</td></tr></tbody></table>
+<p class="note">股數以整股四捨五入估算，未計手續費、交易稅及價格變動。此處 7:3 指股票市值與現金比例，不代表槓桿後市場曝險比例。實際成交後請重新輸入數字核對。</p></section>
+</main>
+<script>
+const $=id=>document.getElementById(id), n=id=>Math.max(0,Number($(id).value)||0);
+const f=x=>Math.round(x).toLocaleString('zh-TW'), pct=x=>(x*100).toFixed(2)+'%';
+function put(id,v,cls){$(id).textContent=v;$(id).className=cls||''}
+function side(id,x){put(id,x>0?'買進':x<0?'賣出':'不動作',x>0?'buy':x<0?'sell':'neutral')}
+function calc(){
+ const q1=n('q685'),p1=n('p685'),q2=n('q631'),p2=n('p631'),cash=n('cashInput');
+ const v1=q1*p1,v2=q2*p2,stocks=v1+v2,total=stocks+cash;
+ const targetStocks=total*.7,targetCash=total*.3;
+ const t1=stocks?targetStocks*v1/stocks:targetStocks/2,t2=stocks?targetStocks*v2/stocks:targetStocks/2;
+ const d1=t1-v1,d2=t2-v2,dc=targetCash-cash;
+ put('total',f(total)+' 元');put('stock',f(stocks)+' 元');put('stockPct',total?pct(stocks/total):'—');put('cashPct',total?pct(cash/total):'—');
+ $('stockBar').style.width=(total?stocks/total*100:0)+'%';$('cashBar').style.width=(total?cash/total*100:0)+'%';
+ put('stockLegend',total?pct(stocks/total):'—');put('cashLegend',total?pct(cash/total):'—');
+ [['v685',v1],['v631',v2],['vCash',cash],['t685',t1],['t631',t2],['tCash',targetCash]].forEach(([id,v])=>put(id,f(v)));
+ [['d685',d1],['d631',d2],['dCash',dc]].forEach(([id,v])=>put(id,(v>0?'+':'')+f(v),v>0?'buy':v<0?'sell':'neutral'));
+ const s1=p1?Math.round(d1/p1):0,s2=p2?Math.round(d2/p2):0;
+ put('s685',f(Math.abs(s1)));side('a685',s1);put('s631',f(Math.abs(s2)));side('a631',s2);
+ put('targetNote','股票目標合計 '+f(targetStocks)+' 元（70%），現金目標 '+f(targetCash)+' 元（30%）。兩檔股票依目前市值比例分配目標部位。');
+}
+['q685','p685','q631','p631','cashInput'].forEach(id=>$(id).addEventListener('input',calc));
+$('reset').addEventListener('click',()=>{[['q685',501000],['p685',7.96],['q631',228000],['p631',24.62],['cashInput',4147000]].forEach(([id,v])=>$(id).value=v);calc()});
+calc();
+</script></body></html>
